@@ -1,0 +1,39 @@
+---
+title: "Diabetes Prediction"
+author: "Sajudra Gupta"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Calling of libraries
+```{r}
+library(dplyr)
+library(tidyr)
+library(caret)
+library(rpart)
+library(base)
+```
+
+```{r}
+#Preparing data frame
+new_data <- data.frame(
+  Glucose = c(127, 173),
+  BMI = c(26, 32),
+  BloodPressure = c(30, 67),
+  Insulin = c(30, 0)
+)
+```
+
+```{r}
+#Loading the model
+model <- readRDS("Diabetes Prediction.rds")
+```
+
+```{r}
+#Predictions
+prediction <- predict(model, new_data)
+prediction
+accuracy_pred <- model$results$Accuracy[1]
+accuracy_pred
+```
+

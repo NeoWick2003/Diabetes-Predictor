@@ -1,0 +1,127 @@
+---
+title: "Predicting Diabetes using SVM"
+author: "Sajudra Gupta"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Calling of libraries
+```{r}
+library(dplyr)
+library(tidyr)
+library(caret)
+library(rpart)
+library(base)
+```
+
+
+
+
+# Part 1: Loading of data
+```{r}
+diabetes <- read.csv("diabetes.csv")
+```
+
+# Part 2: Exploratory data analysis
+```{r}
+#Checking the variables
+head(diabetes)
+
+#Summary of data provided
+summary(diabetes)
+
+#Count no. of NAs
+colSums(is.na(diabetes))
+
+table(diabetes$Outcome) #Checks the frequency of the given variable
+hist(diabetes$Outcome) #Histogram for outcomes
+```
+
+From the histogram, it is evident that the data is quite imbalanced. So, we have to apply re-sampling techniques to ensure that it can prevent from making wrong predictions by prioritising the data. Before that, we need to select the features with which we wish to create our models. Then we can 
+
+# Part 3: Data Preprocessing
+```{r}
+# Selection of necessary variables
+diabetes_clean <- dplyr::select(diabetes, Glucose, BloodPressure, BMI, Insulin, Outcome)
+head(diabetes_clean)
+plot(diabetes_clean)
+```
+
+As we can see, correlation was performed here in order to select the features for classification. Now, we can start with the splitting of data into train set and test set. Since SVM has a distance based approach, it is better to scale the data so that errors can be avoided. 
+
+Here, we have created some custom functions, to avoid repetitive functions. 
+```{r}
+# Functions for scaling and splitting data
+scale_dataset <- function(diabetes) #For data scaling
+{
+  X <- dplyr::select(diabetes, Glucose, BloodPressure, BMI, Insulin, Outcome)
+  diabetes$Outcome = as.factor(diabetes$Outcome)
+  X [,1:4] <- scale(X[,1:4])
+  return(X)
+}
+
+split_data <- function(diabetes_clean) # For data splitting
+{
+  train_split = createDataPartition(diabetes_clean$Outcome, p = 0.8, list = FALSE)
+  train_diabetes = diabetes_clean[train_split,]
+  test_diabetes = diabetes_clean[-train_split,]
+  return(list(train_diabetes,test_diabetes))
+}
+```
+
+```{r}
+#Scaling and splitting the dataset
+diabetes_scale <- scale_dataset(diabetes)
+set.seed(123) #For reproducibility
+diabetes_test_train <- split_data(diabetes_scale)
+train_diabetes = diabetes_test_train[[1]]
+test_diabetes = diabetes_test_train [[2]]
+```
+
+We can see that the data has been successfully scaled and splitted into training set and test set. Now, we can resample the training data, in order to prevent wrong predictions. For this case we shall use undersampling. 
+
+```{r}
+#Applying undersampling
+train_diabetes$Outcome <- as.factor(train_diabetes$Outcome)
+test_diabetes$Outcome <- as.factor(test_diabetes$Outcome)
+train_diabetes_under <- downSample(train_diabetes[, -ncol(train_diabetes)], y = train_diabetes$Outcome, yname = "Outcome")
+table(train_diabetes_under$Outcome) 
+```
+
+As we can see now, the Outcome dataset is balanced, with both 0s and 1s having the same frequency. So now, we can proceed to training the model with SVM. We used a 5-fold cross validation, which was repeated 10 times for more accurate results.
+
+# Training the model
+```{r}
+# Model training by implementing SVM
+diabetes_model <- train(Outcome~., data = train_diabetes_under, method = "svmLinear", metric = "Accuracy", trControl = trainControl(method = "repeatedcv", number = 5, repeats = 10))
+accuracy_train <- diabetes_model$results$Accuracy[1] #To extract accuracy
+accuracy_train
+pred_diabetes<-predict(diabetes_model, test_diabetes)
+accuracy_test <-sum(pred_diabetes  == test_diabetes$Outcome) / nrow(test_diabetes)
+accuracy_test
+pres_diabetes<- posPredValue(pred_diabetes, test_diabetes$Outcome, positive = "1")
+recall_diabetes <- sensitivity(pred_diabetes, test_diabetes$Outcome, positive = "1")
+f1_diabetes<- (2 * recall_diabetes * pres_diabetes) / (recall_diabetes + pres_diabetes)
+
+
+pres_diabetes
+recall_diabetes
+f1_diabetes
+```
+
+# Model results
+
+|              Dataset             |              Accuracy              | 
+|----------------------------------|------------------------------------|
+| Training dataset                 |  `r round(accuracy_train *100, 2)` |
+| Testing dataset                  |  `r round(accuracy_test *100, 2)`  | 
+
+As we can see that the model has a good fit, it is safe to say that the model is now ready for testing. We shall make a random dataset and check how the model predicts. 
+
+First we shall save the model. 
+```{r}
+saveRDS(diabetes_model, "Diabetes Prediction.rds")
+```
+
+ 
+
